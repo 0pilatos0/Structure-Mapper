@@ -1,5 +1,5 @@
 import { parseArgs } from "util";
-import { extname, join } from "path";
+import { extname, join, resolve } from "path";
 import { existsSync } from "fs";
 import chalk from "chalk";
 
@@ -23,10 +23,10 @@ export function parseCliArgs() {
     process.exit(0);
   }
 
-  const inputPath = values.input || positionals[0];
+  const inputPath = resolve(values.input || positionals[0]);
   validateInputPath(inputPath);
 
-  const outputPath = values.output || join(process.cwd(), "output", "structure.json");
+  const outputPath = resolve(values.output || join(process.cwd(), "output", "structure.json"));
   validateOutputPath(outputPath);
 
   return { inputPath, outputPath, values };

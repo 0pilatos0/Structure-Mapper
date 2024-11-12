@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, dirname } from "path";
 import { existsSync, mkdirSync } from "fs";
 import ora from "ora";
 import { parseCliArgs } from "./cli/args";
@@ -9,7 +9,7 @@ import { JsonAnalyzer } from "./utils/jsonAnalyzer";
 const { inputPath, outputPath, values } = parseCliArgs();
 
 // Create output directory if it doesn't exist
-const outputDir = outputPath.split("/").slice(0, -1).join("/");
+const outputDir = dirname(outputPath);
 if (!existsSync(outputDir)) {
   mkdirSync(outputDir, { recursive: true });
 }

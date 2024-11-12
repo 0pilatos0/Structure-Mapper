@@ -22,7 +22,8 @@ A command-line tool that analyzes JSON files and generates a structural represen
 1. Clone the repository:
 
 ```bash
-
+git clone https://github.com/0pilatos0/structuremapper.git
+cd structuremapper
 ```
 
 2. Install dependencies:
@@ -142,7 +143,7 @@ MIT License - feel free to use this tool in your projects.
 
 ## Author
 
-Paul van der Lei - [0pilatos0](https://github.com/0pilatos0)
+Paul van der Lei - 0pilatos0]
 
 ## Acknowledgments
 

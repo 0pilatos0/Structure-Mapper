@@ -38,7 +38,7 @@ ${chalk.bold.blue("JSON Structure Analyzer")}
 ${chalk.dim("Analyzes JSON files and outputs their structure")}
 
 ${chalk.yellow("Usage:")}
-  $ bun run index.ts [options]
+  $ bun start [options]
 
 ${chalk.yellow("Options:")}
   ${chalk.green("-i, --input")}    Input JSON file path ${chalk.red("(required)")}
@@ -48,9 +48,9 @@ ${chalk.yellow("Options:")}
   ${chalk.green("-h, --help")}     Show this help message
 
 ${chalk.yellow("Examples:")}
-  $ bun run index.ts -i ./data.json
-  $ bun run index.ts -i ./data.json -o ./custom/output.json
-  $ bun run index.ts -i ./data.json -v
+  $ bun start -i ./data.json
+  $ bun start -i ./data.json -o ./custom/output.json
+  $ bun start -i ./data.json -v
 `;
 }
 

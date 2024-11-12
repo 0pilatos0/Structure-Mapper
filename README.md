@@ -37,7 +37,7 @@ bun install
 Basic usage:
 
 ```bash
-bun run index.ts -i ./path/to/input.json
+bun start -i ./path/to/input.json
 ```
 
 ### Command Line Options
@@ -56,25 +56,25 @@ Options:
 Analyze a JSON file with default output location:
 
 ```bash
-bun run index.ts -i ./data.json
+bun start -i ./data.json
 ```
 
 Specify custom output location:
 
 ```bash
-bun run index.ts -i ./data.json -o ./custom/output.json
+bun start -i ./data.json -o ./custom/output.json
 ```
 
 Run with verbose logging:
 
 ```bash
-bun run index.ts -i ./data.json -v
+bun start -i ./data.json -v
 ```
 
 Run silently (useful for scripts):
 
 ```bash
-bun run index.ts -i ./data.json -s
+bun start -i ./data.json -s
 ```
 
 ## Output Format
@@ -143,7 +143,7 @@ MIT License - feel free to use this tool in your projects.
 
 ## Author
 
-Paul van der Lei - 0pilatos0]
+Paul van der Lei - 0pilatos0
 
 ## Acknowledgments
 

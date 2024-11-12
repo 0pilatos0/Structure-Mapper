@@ -109,7 +109,7 @@ export class JsonAnalyzer {
   calculateStructureComplexity(structure: any): { maxDepth: number; uniqueFields: number } {
     const uniqueFields = new Set<string>();
 
-    function traverse(obj: any, depth: number = 0): number {
+    function traverse(obj: any, currentPath: string = "", depth: number = 1): number {
       if (!obj || typeof obj !== "object") {
         return depth;
       }
@@ -118,23 +118,27 @@ export class JsonAnalyzer {
 
       if (Array.isArray(obj)) {
         if (obj.length > 0) {
-          return traverse(obj[0], depth);
+          const elementDepth = traverse(obj[0], currentPath, depth);
+          return Math.max(maxDepth, elementDepth);
         }
         return depth;
       }
 
       for (const [key, value] of Object.entries(obj)) {
-        uniqueFields.add(key);
+        const fieldPath = currentPath ? `${currentPath}.${key}` : key;
+        uniqueFields.add(fieldPath);
+
         if (typeof value === "object" && value !== null) {
-          const currentDepth = traverse(value, depth + 1);
-          maxDepth = Math.max(maxDepth, currentDepth);
+          const childDepth = traverse(value, fieldPath, depth + 1);
+          maxDepth = Math.max(maxDepth, childDepth);
         }
       }
 
       return maxDepth;
     }
 
-    const maxDepth = traverse(structure);
+    const maxDepth = traverse(structure) - 1;
+
     return {
       maxDepth,
       uniqueFields: uniqueFields.size,

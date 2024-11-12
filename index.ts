@@ -179,6 +179,42 @@ function determineJsonStructure(data: any, depth: number = 0): any {
   return typeof data;
 }
 
+// Add this new helper function before main()
+function calculateStructureComplexity(structure: any): { maxDepth: number; uniqueFields: number } {
+  const uniqueFields = new Set<string>();
+
+  function traverse(obj: any, depth: number = 0): number {
+    if (!obj || typeof obj !== "object") {
+      return depth;
+    }
+
+    let maxDepth = depth;
+
+    if (Array.isArray(obj)) {
+      if (obj.length > 0) {
+        return traverse(obj[0], depth);
+      }
+      return depth;
+    }
+
+    for (const [key, value] of Object.entries(obj)) {
+      uniqueFields.add(key);
+      if (typeof value === "object" && value !== null) {
+        const currentDepth = traverse(value, depth + 1);
+        maxDepth = Math.max(maxDepth, currentDepth);
+      }
+    }
+
+    return maxDepth;
+  }
+
+  const maxDepth = traverse(structure);
+  return {
+    maxDepth,
+    uniqueFields: uniqueFields.size,
+  };
+}
+
 // Main execution
 async function main() {
   const spinner = ora();
@@ -206,10 +242,19 @@ async function main() {
     await Bun.write(outputFile, JSON.stringify(structure, null, 2));
     if (!values.silent) spinner.succeed("Results written successfully");
 
+    // Enhanced logging with more detailed information
+    const outputStats = await outputFile.size;
+    const compressionRatio = ((outputStats / file.size) * 100).toFixed(1);
+    const structureComplexity = calculateStructureComplexity(structure);
+
     logger.success("\nAnalysis Summary:");
     logger.info(`⏱️  Time taken: ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
     logger.info(`📊 Input size: ${(file.size / 1024).toFixed(2)} KB`);
-    logger.info(`📝 Output: ${outputPath}`);
+    logger.info(`📊 Output size: ${(outputStats / 1024).toFixed(2)} KB`);
+    logger.info(`📈 Compression ratio: ${compressionRatio}%`);
+    logger.info(`🔍 Structure depth: ${structureComplexity.maxDepth} levels`);
+    logger.info(`🔢 Unique fields: ${structureComplexity.uniqueFields}`);
+    logger.info(`📝 Output path: ${outputPath}`);
 
     // Ensure spinner is stopped and process exits cleanly
     spinner.stop();

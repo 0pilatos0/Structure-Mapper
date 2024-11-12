@@ -22,7 +22,7 @@ A command-line tool that analyzes JSON files and generates a structural represen
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/0pilatos0/structuremapper.git
+git clone https://github.com/0pilatos0/Structure-Mapper.git
 cd structuremapper
 ```
 

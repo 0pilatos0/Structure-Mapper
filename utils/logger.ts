@@ -12,7 +12,7 @@ export class Logger {
   }
 
   info(message: string) {
-    if (!this.silent) console.log(chalk.blue(message));
+    if (!this.silent) console.log(message);
   }
 
   success(message: string) {

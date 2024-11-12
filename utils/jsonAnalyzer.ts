@@ -44,11 +44,6 @@ export class JsonAnalyzer {
   private mergeStructures(structures: any[]): any {
     if (structures.length === 0) return {};
 
-    if (structures.every((s) => typeof s !== "object" || s === "empty[]")) {
-      const nonEmptyStructures = structures.filter((s) => s !== "empty[]");
-      return nonEmptyStructures.length > 0 ? nonEmptyStructures[0] : "empty[]";
-    }
-
     const merged: Record<string, any> = {};
     structures.forEach((struct) => {
       if (typeof struct === "object" && struct !== null) {
@@ -69,8 +64,10 @@ export class JsonAnalyzer {
               } else {
                 merged[key] = "empty[]";
               }
+            } else if (typeof merged[key] === "object" && typeof value === "object") {
+              merged[key] = this.mergeStructures([merged[key], value]);
             } else {
-              merged[key] = merged[key];
+              merged[key] = value;
             }
           }
         });

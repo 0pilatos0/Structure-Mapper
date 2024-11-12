@@ -181,8 +181,8 @@ function determineJsonStructure(data: any, depth: number = 0): any {
 
 // Main execution
 async function main() {
+  const spinner = ora();
   try {
-    const spinner = ora();
     if (!values.silent) spinner.start("Reading file");
 
     const file = Bun.file(inputPath);
@@ -210,7 +210,14 @@ async function main() {
     logger.info(`⏱️  Time taken: ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
     logger.info(`📊 Input size: ${(file.size / 1024).toFixed(2)} KB`);
     logger.info(`📝 Output: ${outputPath}`);
+
+    // Ensure spinner is stopped and process exits cleanly
+    spinner.stop();
+    process.exit(0);
   } catch (error: any) {
+    // Stop spinner before showing error
+    spinner.stop();
+
     if (error instanceof SyntaxError) {
       logger.error("\nError: Invalid JSON format in input file");
     } else {
@@ -219,5 +226,16 @@ async function main() {
     process.exit(1);
   }
 }
+
+// Wrap main execution in process error handlers
+process.on("uncaughtException", (error) => {
+  console.error("\nFatal error:", error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("\nUnhandled Rejection at:", promise, "reason:", reason);
+  process.exit(1);
+});
 
 main();

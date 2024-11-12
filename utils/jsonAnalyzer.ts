@@ -2,19 +2,29 @@ import { Logger } from "./logger";
 
 export class JsonAnalyzer {
   private logger: Logger;
+  private processedItems: number = 0;
+  private totalItems: number = 0;
 
   constructor(logger: Logger) {
     this.logger = logger;
   }
 
   determineJsonStructure(data: any, depth: number = 0): any {
+    if (depth === 0) {
+      this.processedItems = 0;
+      this.totalItems = this.countTotalItems(data);
+      this.logger.verboseLog(`Starting analysis of ${this.totalItems} total items/fields`);
+    }
+
     if (Array.isArray(data)) {
       if (data.length === 0) return "empty[]";
 
       const structures: any[] = [];
       data.forEach((item, index) => {
+        this.processedItems++;
         if (this.logger.verbose && index % 100 === 0 && depth === 0) {
-          this.logger.verboseLog(`Processing item ${index + 1}/${data.length}`);
+          const progress = ((this.processedItems / this.totalItems) * 100).toFixed(1);
+          this.logger.verboseLog(`Processing array item ${index + 1}/${data.length} (${progress}% complete)`);
         }
         structures.push(this.determineJsonStructure(item, depth + 1));
       });
@@ -28,9 +38,15 @@ export class JsonAnalyzer {
       const structure: Record<string, any> = {};
       const entries = Object.entries(data);
 
+      if (depth === 0 && this.logger.verbose) {
+        this.logger.verboseLog(`Found ${entries.length} top-level fields`);
+      }
+
       entries.forEach(([key, value], index) => {
-        if (this.logger.verbose && index % 1000 === 0 && depth === 0) {
-          this.logger.verboseLog(`Processing field: ${key}`);
+        this.processedItems++;
+        if (this.logger.verbose && (index % 1000 === 0 || index === entries.length - 1) && depth === 0) {
+          const progress = ((this.processedItems / this.totalItems) * 100).toFixed(1);
+          this.logger.verboseLog(`Processing field "${key}" (${index + 1}/${entries.length}, ${progress}% complete)`);
         }
         structure[key] = this.determineJsonStructure(value, depth + 1);
       });
@@ -39,6 +55,20 @@ export class JsonAnalyzer {
     }
 
     return typeof data;
+  }
+
+  private countTotalItems(data: any): number {
+    let count = 1;
+    if (Array.isArray(data)) {
+      data.forEach((item) => {
+        count += this.countTotalItems(item);
+      });
+    } else if (typeof data === "object" && data !== null) {
+      Object.values(data).forEach((value) => {
+        count += this.countTotalItems(value);
+      });
+    }
+    return count;
   }
 
   private mergeStructures(structures: any[]): any {

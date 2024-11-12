@@ -1,0 +1,43 @@
+{
+    "hallo": "welt",
+    "user": {
+        "name": "John Doe",
+        "age": 30
+    },
+    "users": [
+        {
+            "name": "John Doe",
+            "age": 30
+        },
+        {
+            "name": "John Doe",
+            "age": 30,
+            "isActive": true,
+            "relevance": {
+                "score": 0.9,
+                "reason": "The user is active and has a high age"
+            },
+            "array": []
+        },
+        {
+            "name": "John Doe",
+            "age": 30,
+            "isActive": true,
+            "relevance": {
+                "score": 0.9,
+                "reason": "The user is active and has a high age"
+            },
+            "array": [
+                {
+                    "name": "John Doe",
+                    "age": 30
+                },
+                {
+                    "name": "John Doe",
+                    "age": 30,
+                    "choice": "yes"
+                }
+            ]
+        }
+    ]
+}

@@ -8,7 +8,8 @@
     "structuremapper": "index.ts"
   },
   "scripts": {
-    "start": "bun index.ts"
+    "start": "bun index.ts",
+    "test": "bun test"
   },
   "keywords": [
     "json",

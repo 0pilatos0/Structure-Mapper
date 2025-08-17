@@ -13,23 +13,42 @@ export class JsonAnalyzer {
     if (depth === 0) {
       this.processedItems = 0;
       this.totalItems = this.countTotalItems(data);
-      this.logger.verboseLog(`Starting analysis of ${this.totalItems} total items/fields`);
+      this.logger.verboseLog(
+        `Starting analysis of ${this.totalItems} total items/fields`
+      );
     }
 
     if (Array.isArray(data)) {
       if (data.length === 0) return "empty[]";
-
-      const structures: any[] = [];
+      const elementStructures: any[] = [];
       data.forEach((item, index) => {
         this.processedItems++;
         if (this.logger.verbose && index % 100 === 0 && depth === 0) {
-          const progress = ((this.processedItems / this.totalItems) * 100).toFixed(1);
-          this.logger.verboseLog(`Processing array item ${index + 1}/${data.length} (${progress}% complete)`);
+          const progress = (
+            (this.processedItems / this.totalItems) *
+            100
+          ).toFixed(1);
+          this.logger.verboseLog(
+            `Processing array item ${index + 1}/${
+              data.length
+            } (${progress}% complete)`
+          );
         }
-        structures.push(this.determineJsonStructure(item, depth + 1));
+        elementStructures.push(this.determineJsonStructure(item, depth + 1));
       });
 
-      return [this.mergeStructures(structures)];
+      // If all primitive (string identifiers for primitive or special markers like "null" / "empty[]")
+      if (
+        elementStructures.every(
+          (s) => typeof s === "string" && !["object"].includes(s)
+        )
+      ) {
+        const unique = Array.from(new Set(elementStructures));
+        if (unique.length === 1) return [unique[0]];
+        return [unique.sort().join("|")];
+      }
+
+      return [this.mergeStructures(elementStructures)];
     }
 
     if (data === null) return "null";
@@ -44,9 +63,20 @@ export class JsonAnalyzer {
 
       entries.forEach(([key, value], index) => {
         this.processedItems++;
-        if (this.logger.verbose && (index % 1000 === 0 || index === entries.length - 1) && depth === 0) {
-          const progress = ((this.processedItems / this.totalItems) * 100).toFixed(1);
-          this.logger.verboseLog(`Processing field "${key}" (${index + 1}/${entries.length}, ${progress}% complete)`);
+        if (
+          this.logger.verbose &&
+          (index % 1000 === 0 || index === entries.length - 1) &&
+          depth === 0
+        ) {
+          const progress = (
+            (this.processedItems / this.totalItems) *
+            100
+          ).toFixed(1);
+          this.logger.verboseLog(
+            `Processing field "${key}" (${index + 1}/${
+              entries.length
+            }, ${progress}% complete)`
+          );
         }
         structure[key] = this.determineJsonStructure(value, depth + 1);
       });
@@ -88,13 +118,18 @@ export class JsonAnalyzer {
               const currentArray = currentIsArray ? merged[key] : [merged[key]];
               const newArray = newIsArray ? value : [value];
 
-              const combinedArrays = [...currentArray, ...newArray].filter((item) => item !== "empty[]");
+              const combinedArrays = [...currentArray, ...newArray].filter(
+                (item) => item !== "empty[]"
+              );
               if (combinedArrays.length > 0) {
                 merged[key] = [this.mergeStructures(combinedArrays)];
               } else {
                 merged[key] = "empty[]";
               }
-            } else if (typeof merged[key] === "object" && typeof value === "object") {
+            } else if (
+              typeof merged[key] === "object" &&
+              typeof value === "object"
+            ) {
               merged[key] = this.mergeStructures([merged[key], value]);
             } else {
               merged[key] = value;
@@ -106,10 +141,17 @@ export class JsonAnalyzer {
     return merged;
   }
 
-  calculateStructureComplexity(structure: any): { maxDepth: number; uniqueFields: number } {
+  calculateStructureComplexity(structure: any): {
+    maxDepth: number;
+    uniqueFields: number;
+  } {
     const uniqueFields = new Set<string>();
 
-    function traverse(obj: any, currentPath: string = "", depth: number = 1): number {
+    function traverse(
+      obj: any,
+      currentPath: string = "",
+      depth: number = 1
+    ): number {
       if (!obj || typeof obj !== "object") {
         return depth;
       }

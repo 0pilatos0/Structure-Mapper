@@ -1,0 +1,16 @@
+{
+  "user": {
+    "id": 123,
+    "name": "Alice",
+    "roles": [
+      { "id": 1, "label": "admin" },
+      { "id": 2, "permissions": ["read", "write"] }
+    ]
+  },
+  "events": [
+    { "type": "login", "success": true },
+    { "type": "logout", "meta": { "duration": 42 } }
+  ],
+  "active": true,
+  "tags": []
+}

@@ -6,7 +6,7 @@ import pkg from "../package.json" assert { type: "json" };
 
 export const SUPPORTED_EXTENSIONS = [".json"];
 
-interface CliOptions {
+export interface CliOptions {
   inputPath?: string;
   outputPath?: string;
   print: boolean;
@@ -18,9 +18,19 @@ interface CliOptions {
   help: boolean;
 }
 
-export function parseCliArgs(): { options: CliOptions } {
+export interface ParseResult {
+  options: CliOptions;
+  mode?: "help" | "version";
+}
+
+export function parseCliArgs(cfg?: {
+  args?: string[];
+  allowExit?: boolean;
+}): ParseResult {
+  const args = cfg?.args ?? Bun.argv.slice(2);
+  const allowExit = cfg?.allowExit !== false;
   const { values, positionals } = parseArgs({
-    args: Bun.argv.slice(2),
+    args,
     options: {
       input: { type: "string", short: "i" },
       output: { type: "string", short: "o" },
@@ -42,16 +52,24 @@ export function parseCliArgs(): { options: CliOptions } {
   }
 
   if (values.version) {
-    console.log((pkg as any).version ?? "0.0.0");
-    process.exit(0);
+    if (allowExit) {
+      console.log((pkg as any).version ?? "0.0.0");
+      process.exit(0);
+    } else {
+      return { options: emptyOptions(), mode: "version" };
+    }
   }
 
   if (
     values.help ||
     (positionals.length === 0 && !values.input && !values.stdin)
   ) {
-    console.log(getHelpText());
-    process.exit(0);
+    if (allowExit) {
+      console.log(getHelpText());
+      process.exit(0);
+    } else {
+      return { options: emptyOptions(), mode: "help" };
+    }
   }
 
   const stdin = values.stdin ?? false;
@@ -59,8 +77,13 @@ export function parseCliArgs(): { options: CliOptions } {
   if (!stdin) {
     const supplied = values.input || positionals[0];
     if (!supplied) {
-      console.error(chalk.red("Error: input path or --stdin required"));
-      process.exit(1);
+      const msg = "Error: input path or --stdin required";
+      if (allowExit) {
+        console.error(chalk.red(msg));
+        process.exit(1);
+      } else {
+        throw new Error(msg);
+      }
     }
     inputPath = resolve(supplied);
     validateInputPath(inputPath);
@@ -126,25 +149,24 @@ ${chalk.yellow("Examples:")}
 
 function validateInputPath(path: string): void {
   if (!path) {
-    console.error(chalk.red("Error: Input file path is required"));
-    process.exit(1);
+    const msg = "Error: Input file path is required";
+    console.error(chalk.red(msg));
+    throw new Error(msg);
   }
 
   if (!existsSync(path)) {
-    console.error(chalk.red(`Error: Input file not found: ${path}`));
-    process.exit(1);
+    const msg = `Error: Input file not found: ${path}`;
+    console.error(chalk.red(msg));
+    throw new Error(msg);
   }
 
   const extension = extname(path).toLowerCase();
   if (!SUPPORTED_EXTENSIONS.includes(extension)) {
-    console.error(
-      chalk.red(
-        `Error: Unsupported file type. Supported types: ${SUPPORTED_EXTENSIONS.join(
-          ", "
-        )}`
-      )
-    );
-    process.exit(1);
+    const msg = `Error: Unsupported file type. Supported types: ${SUPPORTED_EXTENSIONS.join(
+      ", "
+    )}`;
+    console.error(chalk.red(msg));
+    throw new Error(msg);
   }
 }
 
@@ -155,4 +177,18 @@ function validateOutputPath(path: string): void {
       chalk.red(`Warning: Output file should have .json extension`)
     );
   }
+}
+
+function emptyOptions(): CliOptions {
+  return {
+    inputPath: undefined,
+    outputPath: undefined,
+    print: false,
+    stdin: false,
+    silent: false,
+    verbose: false,
+    noColor: false,
+    version: false,
+    help: false,
+  };
 }

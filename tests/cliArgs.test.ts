@@ -46,4 +46,35 @@ describe("parseCliArgs", () => {
     const { mode } = parseCliArgs({ args: [], allowExit: false });
     expect(mode).toBe("help");
   });
+
+  test("unsupported input extension throws", () => {
+    const bad = join(process.cwd(), "bad.txt");
+    writeFileSync(bad, "hello");
+    expect(() => parseCliArgs({ args: [bad], allowExit: false })).toThrow(
+      /Unsupported file type/
+    );
+  });
+
+  test("nonexistent file path throws", () => {
+    const missing = join(process.cwd(), "__nope__does_not_exist.json");
+    expect(() => parseCliArgs({ args: [missing], allowExit: false })).toThrow(
+      /not found/
+    );
+  });
+
+  test("no-color flag sets option", () => {
+    const { options } = parseCliArgs({
+      args: [tmpFile, "--no-color"],
+      allowExit: false,
+    });
+    expect(options.noColor).toBe(true);
+  });
+
+  test("output extension warning does not throw", () => {
+    const { options } = parseCliArgs({
+      args: [tmpFile, "-o", "out.txt"],
+      allowExit: false,
+    });
+    expect(options.outputPath?.endsWith("out.txt")).toBe(true);
+  });
 });

@@ -67,4 +67,22 @@ describe("JsonAnalyzer.determineJsonStructure", () => {
       },
     ]);
   });
+
+  test("root primitive array", () => {
+    const analyzer = make();
+    const structure = analyzer.determineJsonStructure([1, 2, 3]);
+    expect(structure).toEqual(["number"]);
+  });
+
+  test("root empty array", () => {
+    const analyzer = make();
+    const structure = analyzer.determineJsonStructure([]);
+    expect(structure).toBe("empty[]");
+  });
+
+  test("union primitive array", () => {
+    const analyzer = make();
+    const structure = analyzer.determineJsonStructure([1, "a", 2]);
+    expect(structure).toEqual(["number|string"]);
+  });
 });

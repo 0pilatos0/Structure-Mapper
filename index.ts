@@ -1,4 +1,4 @@
-import { join, dirname } from "path";
+import { dirname } from "path";
 import { existsSync, mkdirSync } from "fs";
 import ora from "ora";
 import chalk from "chalk";
@@ -7,140 +7,279 @@ import { Logger } from "./utils/logger";
 import { JsonAnalyzer } from "./utils/jsonAnalyzer";
 
 // Parse CLI arguments
-const { inputPath, outputPath, values } = parseCliArgs();
+const { options } = parseCliArgs();
+const { inputPath, outputPath, stdin, print, silent, verbose } = options;
 
 // Create output directory if it doesn't exist
-const outputDir = dirname(outputPath);
-if (!existsSync(outputDir)) {
-  mkdirSync(outputDir, { recursive: true });
+if (outputPath) {
+  const outputDir = dirname(outputPath);
+  if (!existsSync(outputDir)) {
+    mkdirSync(outputDir, { recursive: true });
+  }
 }
 
 // Initialize logger and JSON analyzer
-const logger = new Logger(values.silent ?? false, values.verbose ?? false);
+const logger = new Logger(silent, verbose);
 const jsonAnalyzer = new JsonAnalyzer(logger);
 
 // Main execution
 async function main() {
   const spinner = ora();
   try {
-    // Read file in chunks and show progress
-    if (!values.silent) spinner.start(chalk.blue("Reading input file"));
-    const file = Bun.file(inputPath);
-    const fileSize = file.size;
+    if (!silent) {
+      spinner.start(
+        chalk.blue(stdin ? "Reading from STDIN" : "Reading input file")
+      );
+    }
 
-    // Show file size warning for large files
+    const { json, fileSize } = await readInput(
+      stdin,
+      inputPath,
+      spinner,
+      silent
+    );
+
     if (fileSize > 100 * 1024 * 1024) {
-      // 100MB
-      logger.info(chalk.yellow("\n⚠️  Large file detected. This might take a while..."));
+      logger.info(
+        chalk.yellow("\n⚠️  Large input detected. This might take a while...")
+      );
     }
+    logger.verboseLog(`Total input size: ${formatFileSize(fileSize)}`);
 
-    logger.verboseLog(`Total file size: ${formatFileSize(fileSize)}`);
-
-    // Read the file
-    let json = await file.text();
-    if (!values.silent) spinner.succeed(chalk.green("File read successfully"));
-
-    // Parse JSON with progress
-    if (!values.silent) spinner.start(chalk.blue("Parsing JSON"));
+    if (!silent) {
+      spinner.start(chalk.blue("Parsing JSON"));
+    }
     logger.verboseLog("Starting JSON parse...");
-
-    const parseStart = performance.now();
-    let data;
-
-    try {
-      data = JSON.parse(json);
-      const parseTime = ((performance.now() - parseStart) / 1000).toFixed(2);
-      logger.verboseLog(`JSON parsed in ${parseTime} seconds`);
-      if (!values.silent) spinner.succeed(chalk.green("JSON parsed successfully"));
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        throw new Error(`Failed to parse JSON: ${e.message}`);
-      }
-      throw new Error("Failed to parse JSON: Unknown error");
+    const { data, parseTime } = parseJson(json);
+    logger.verboseLog(`JSON parsed in ${parseTime.toFixed(2)} seconds`);
+    if (!silent) {
+      spinner.succeed(chalk.green("JSON parsed successfully"));
     }
 
-    // Memory cleanup
-    json = "";
     global.gc?.();
 
-    // Analyze structure
-    if (!values.silent) {
+    if (!silent) {
       spinner.start(chalk.blue("Analyzing JSON structure"));
-      logger.verboseLog("Starting structure analysis...");
     }
-
-    const startTime = performance.now();
-    const structure = jsonAnalyzer.determineJsonStructure(data);
-    const endTime = performance.now();
-
-    // Memory cleanup
-    data = null;
+    logger.verboseLog("Starting structure analysis...");
+    const { structure, timeTaken } = analyzeStructure(data);
     global.gc?.();
 
-    // Write output
-    if (!values.silent) spinner.start(chalk.blue("Writing results"));
-    const outputFile = Bun.file(outputPath);
-    await Bun.write(outputFile, JSON.stringify(structure, null, 2));
-    if (!values.silent) spinner.succeed(chalk.green("Analysis complete"));
+    const outputStats = await outputResults(structure, {
+      print,
+      outputPath,
+      silent,
+      spinner,
+    });
 
-    // Calculate statistics
-    const outputStats = await outputFile.size;
-    const compressionRatio = ((outputStats / fileSize) * 100).toFixed(1);
-    const structureComplexity = jsonAnalyzer.calculateStructureComplexity(structure);
-    const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
+    const compressionRatio =
+      fileSize === 0 ? "0" : ((outputStats / fileSize) * 100).toFixed(1);
+    const structureComplexity =
+      jsonAnalyzer.calculateStructureComplexity(structure);
     const topLevelFields = Object.keys(structure).length;
 
-    // Display results
-    logger.info(`\n${chalk.bold.blue("📊 Analysis Summary")}`);
-    logger.info(chalk.dim("─".repeat(40)));
-
-    // File Information Section
-    logger.info(`\n${chalk.blue.bold("📁 File Information:")}`);
-    logger.info(chalk.dim("   Input: ") + chalk.white(inputPath));
-    logger.info(chalk.dim("   Output: ") + chalk.white(outputPath));
-
-    // Size Analysis Section
-    logger.info(`\n${chalk.blue.bold("📈 Size Analysis:")}`);
-    logger.info(chalk.dim("   Input Size: ") + chalk.white(formatFileSize(fileSize)));
-    logger.info(chalk.dim("   Output Size: ") + chalk.white(formatFileSize(outputStats)));
-    logger.info(
-      chalk.dim("   Compression: ") + (Number(compressionRatio) < 50 ? chalk.green(`${compressionRatio}%`) : chalk.yellow(`${compressionRatio}%`))
-    );
-
-    // Structure Analysis Section
-    logger.info(`\n${chalk.blue.bold("🔍 Structure Analysis:")}`);
-    logger.info(chalk.dim("   Max Depth: ") + chalk.white(`${structureComplexity.maxDepth} levels`));
-    logger.info(chalk.dim("   Unique Fields: ") + chalk.white(structureComplexity.uniqueFields));
-    logger.info(chalk.dim("   Top-level Fields: ") + chalk.white(topLevelFields));
-
-    if (Array.isArray(structure)) {
-      logger.info(chalk.dim("   Root Array Items: ") + chalk.white(structure.length.toString()));
-    }
-
-    // Performance Section
-    logger.info(`\n${chalk.blue.bold("⚡ Performance:")}`);
-    logger.info(
-      chalk.dim("   Processing Time: ") + (Number(timeTaken) < 1 ? chalk.green(`${timeTaken} seconds`) : chalk.yellow(`${timeTaken} seconds`))
-    );
-
-    // Memory Usage
-    const memoryUsage = process.memoryUsage();
-    logger.info(chalk.dim("   Memory Used: ") + chalk.white(formatFileSize(memoryUsage.heapUsed)));
-
-    // Success Message
-    logger.success(`\n${chalk.bold.green("✅ Analysis completed successfully!")}`);
+    displaySummary({
+      fileSize,
+      outputStats,
+      compressionRatio,
+      structureComplexity,
+      topLevelFields,
+      structure,
+      timeTaken,
+      inputPath,
+      stdin,
+      print,
+      outputPath,
+    });
 
     spinner.stop();
     process.exit(0);
   } catch (error: any) {
     spinner.stop();
     if (error instanceof SyntaxError) {
-      logger.error(`\n${chalk.bold.red("❌ Error:")} Invalid JSON format in input file`);
+      logger.error(
+        `\n${chalk.bold.red("❌ Error:")} Invalid JSON format in input file`
+      );
     } else {
       logger.error(`\n${chalk.bold.red("❌ Error:")} ${error.message}`);
     }
     process.exit(1);
   }
+}
+
+function concatUint8(chunks: Uint8Array[]): string {
+  const total = chunks.reduce((sum, c) => sum + c.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+  return Buffer.from(merged).toString("utf8");
+}
+
+async function readInput(
+  stdin: boolean,
+  inputPath: string | undefined,
+  spinner: any,
+  silent: boolean
+): Promise<{ json: string; fileSize: number }> {
+  if (stdin) {
+    const reader = Bun.stdin.stream().getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+    reader.releaseLock();
+    const json = concatUint8(chunks);
+    const fileSize = Buffer.byteLength(json, "utf8");
+    if (!silent) spinner.succeed(chalk.green("Read STDIN successfully"));
+    const sanitized = sanitizeStdinJson(json);
+    return { json: sanitized, fileSize };
+  }
+  if (inputPath) {
+    const file = Bun.file(inputPath);
+    const json = await file.text();
+    const fileSize = file.size;
+    if (!silent) spinner.succeed(chalk.green("File read successfully"));
+    return { json, fileSize };
+  }
+  throw new Error("No input provided");
+}
+
+function parseJson(json: string): { data: any; parseTime: number } {
+  const start = performance.now();
+  const data = JSON.parse(json);
+  const parseTime = (performance.now() - start) / 1000;
+  return { data, parseTime };
+}
+
+function analyzeStructure(data: any): { structure: any; timeTaken: number } {
+  const start = performance.now();
+  const structure = jsonAnalyzer.determineJsonStructure(data);
+  const timeTaken = (performance.now() - start) / 1000;
+  return { structure, timeTaken };
+}
+
+async function outputResults(
+  structure: any,
+  {
+    print,
+    outputPath,
+    silent,
+    spinner,
+  }: { print: boolean; outputPath?: string; silent: boolean; spinner: any }
+): Promise<number> {
+  let outputStats = 0;
+  if (print) {
+    if (!silent) spinner.start(chalk.blue("Outputting results"));
+    const outStr = JSON.stringify(structure, null, 2);
+    outputStats = Buffer.byteLength(outStr, "utf8");
+    process.stdout.write(outStr + "\n");
+    if (!silent) spinner.succeed(chalk.green("Printed structure"));
+  } else if (outputPath) {
+    if (!silent) spinner.start(chalk.blue("Writing results"));
+    const outStr = JSON.stringify(structure, null, 2);
+    await Bun.write(Bun.file(outputPath), outStr);
+    outputStats = Buffer.byteLength(outStr, "utf8");
+    if (!silent) spinner.succeed(chalk.green("Analysis complete"));
+  }
+  return outputStats;
+}
+
+function sanitizeStdinJson(raw: string): string {
+  let trimmed = raw.trim();
+  // PowerShell sometimes wraps the piped literal in single quotes; strip if so and inside looks like JSON
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    const inner = trimmed.slice(1, -1);
+    if (inner.startsWith("{") || inner.startsWith("[")) {
+      trimmed = inner;
+    }
+  }
+  return trimmed;
+}
+
+function displaySummary(params: {
+  fileSize: number;
+  outputStats: number;
+  compressionRatio: string;
+  structureComplexity: { maxDepth: number; uniqueFields: number };
+  topLevelFields: number;
+  structure: any;
+  timeTaken: number;
+  inputPath?: string;
+  stdin: boolean;
+  print: boolean;
+  outputPath?: string;
+}) {
+  const {
+    fileSize,
+    outputStats,
+    compressionRatio,
+    structureComplexity,
+    topLevelFields,
+    structure,
+    timeTaken,
+    inputPath,
+    stdin,
+    print,
+    outputPath,
+  } = params;
+
+  logger.info(`\n${chalk.bold.blue("📊 Analysis Summary")}`);
+  logger.info(chalk.dim("─".repeat(40)));
+  logger.info(`\n${chalk.blue.bold("📁 File Information:")}`);
+  if (inputPath) logger.info(chalk.dim("   Input: ") + chalk.white(inputPath));
+  logger.info(chalk.dim("   Source: ") + chalk.white(stdin ? "STDIN" : "FILE"));
+  if (!print && outputPath)
+    logger.info(chalk.dim("   Output: ") + chalk.white(outputPath));
+  if (print) logger.info(chalk.dim("   Output: ") + chalk.white("stdout"));
+  logger.info(`\n${chalk.blue.bold("📈 Size Analysis:")}`);
+  logger.info(
+    chalk.dim("   Input Size: ") + chalk.white(formatFileSize(fileSize))
+  );
+  logger.info(
+    chalk.dim("   Output Size: ") + chalk.white(formatFileSize(outputStats))
+  );
+  logger.info(
+    chalk.dim("   Compression: ") +
+      (Number(compressionRatio) < 50
+        ? chalk.green(`${compressionRatio}%`)
+        : chalk.yellow(`${compressionRatio}%`))
+  );
+  logger.info(`\n${chalk.blue.bold("🔍 Structure Analysis:")}`);
+  logger.info(
+    chalk.dim("   Max Depth: ") +
+      chalk.white(`${structureComplexity.maxDepth} levels`)
+  );
+  logger.info(
+    chalk.dim("   Unique Fields: ") +
+      chalk.white(structureComplexity.uniqueFields)
+  );
+  logger.info(chalk.dim("   Top-level Fields: ") + chalk.white(topLevelFields));
+  if (Array.isArray(structure)) {
+    logger.info(
+      chalk.dim("   Root Array Items: ") +
+        chalk.white(structure.length.toString())
+    );
+  }
+  logger.info(`\n${chalk.blue.bold("⚡ Performance:")}`);
+  logger.info(
+    chalk.dim("   Processing Time: ") +
+      (Number(timeTaken) < 1
+        ? chalk.green(`${timeTaken.toFixed(2)} seconds`)
+        : chalk.yellow(`${timeTaken.toFixed(2)} seconds`))
+  );
+  const memoryUsage = process.memoryUsage();
+  logger.info(
+    chalk.dim("   Memory Used: ") +
+      chalk.white(formatFileSize(memoryUsage.heapUsed))
+  );
+  logger.success(
+    `\n${chalk.bold.green("✅ Analysis completed successfully!")}`
+  );
 }
 
 function formatFileSize(bytes: number): string {

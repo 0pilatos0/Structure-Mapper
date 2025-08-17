@@ -1,154 +1,200 @@
-# JSON Structure Analyzer
+# JSON Structure Analyzer (Structure Mapper)
 
-A command-line tool that analyzes JSON files and generates a structural representation of their schema. Perfect for understanding the structure of large JSON files or validating JSON data patterns.
+Analyze any JSON input and produce a concise structural schema. Great for exploring unknown APIs, reverse‑engineering logs, or quickly summarizing large JSON dumps.
 
-## Features
+## ✨ Highlights
 
-- 🔍 Analyzes any JSON file to determine its structure
-- 📊 Handles nested objects and arrays
-- 🚀 Fast processing with Bun runtime
-- 💡 Smart type inference
-- 📝 Detailed progress tracking
-- 🎨 Beautiful CLI interface with colors and spinners
-- 🔄 Merges array structures intelligently
-- 🛡️ Built-in file validation and error handling
+- 🔍 Infers structure (object fields, nested depth, array element shapes)
+- � Works with files or STDIN streaming (`cat data.json | structuremapper --stdin`)
+- �️ Print directly to stdout (`--print`) or write to a file (default)
+- 📊 Complexity metrics (depth, unique fields, compression ratio)
+- ⚡ Fast: built on the Bun runtime
+- 🔄 Merges heterogeneous array item structures intelligently
+- 🛡️ Validation + clear error messages
+- 🎯 Minimal, zero-config usage (just point at a JSON file)
 
-## Prerequisites
+## 🚀 Install / Run
 
-- [Bun](https://bun.sh) runtime installed on your system
+You need [Bun](https://bun.sh) installed.
 
-## Installation
-
-1. Clone the repository:
+Clone + install dependencies:
 
 ```bash
 git clone https://github.com/0pilatos0/Structure-Mapper.git
-cd structuremapper
-```
-
-2. Install dependencies:
-
-```bash
+cd Structure-Mapper
 bun install
 ```
 
-## Usage
-
-Basic usage:
-
-```bash
-bun start -i ./path/to/input.json
-```
-
-### Command Line Options
-
-```bash
-Options:
-  -i, --input    Input JSON file path (required)
-  -o, --output   Output file path (default: ./output/structure.json)
-  -v, --verbose  Show detailed progress
-  -s, --silent   Suppress all output except errors
-  -h, --help     Show this help message
-```
-
-### Examples
-
-Analyze a JSON file with default output location:
+Run directly with Bun (development):
 
 ```bash
 bun start -i ./data.json
 ```
 
-Specify custom output location:
+Or (after publishing) you could run via npx:
 
 ```bash
-bun start -i ./data.json -o ./custom/output.json
+npx structuremapper data.json --print
 ```
 
-Run with verbose logging:
+## 🧪 Quick Examples
+
+Basic file analysis (writes `./output/structure.json`):
 
 ```bash
-bun start -i ./data.json -v
+structuremapper data.json
 ```
 
-Run silently (useful for scripts):
+Custom output path:
 
 ```bash
-bun start -i ./data.json -s
+structuremapper data.json -o schema/output.json
 ```
 
-## Output Format
+Print to stdout only (no file written):
 
-The tool generates a JSON file that represents the structure of your input data. For example:
+```bash
+structuremapper data.json --print
+```
 
-Input:
+Stream from stdin:
+
+```bash
+curl -s https://api.example.com/data | structuremapper --stdin --print
+```
+
+Verbose progress (parsing + traversal updates):
+
+```bash
+structuremapper data.json -v
+```
+
+Silent mode (machine friendly):
+
+```bash
+structuremapper data.json -s --print > schema.json
+```
+
+Disable colors (CI logs):
+
+```bash
+structuremapper data.json --no-color
+```
+
+Show version:
+
+```bash
+structuremapper --version
+```
+
+## 🧾 CLI Reference
+
+```
+Usage:
+  structuremapper [options] <file>
+  structuremapper --stdin --print < data.json
+
+Options:
+  -i, --input        Input JSON file path (positional argument also works)
+  -o, --output       Output file path (default: ./output/structure.json)
+  -p, --print        Print structure to stdout instead of writing a file
+      --stdin        Read JSON from STDIN
+      --no-color     Disable colored output
+      --version      Show version number
+  -v, --verbose      Show detailed progress logs
+  -s, --silent       Suppress all non-error output
+  -h, --help         Show help
+```
+
+Behavior rules:
+
+- If `--print` is used, no file is written unless you also pass `-o` (not required).
+- One of: a file path (positional / `-i`) OR `--stdin` must be provided.
+- Colors can be disabled for scripting/CI with `--no-color`.
+
+## 🧱 Output Structure
+
+Given this input:
 
 ```json
 {
   "name": "John",
   "age": 30,
-  "hobbies": ["reading", "gaming"]
+  "hobbies": ["reading", "gaming"],
+  "profile": { "active": true, "tags": [] }
 }
 ```
 
-Output:
+You get:
 
 ```json
 {
   "name": "string",
   "age": "number",
-  "hobbies": ["string"]
+  "hobbies": ["string"],
+  "profile": {
+    "active": "boolean",
+    "tags": ["empty[]"]
+  }
 }
 ```
 
-## Features in Detail
+Notes:
 
-### Type Detection
+- Empty arrays are represented as `"empty[]"` so you can distinguish them from populated arrays.
+- Arrays of objects are merged: all discovered fields across items are combined into one representative object.
 
-- Identifies primitive types (string, number, boolean)
-- Handles null values
-- Detects arrays and their content types
-- Maps nested object structures
+## 🧠 How It Works
 
-### Array Handling
+1. Loads JSON (file or STDIN)
+2. Parses eagerly (shows parse timing in verbose mode)
+3. Recursively traverses values, recording:
+   - Field names (unique paths)
+   - Type labels (primitive | object | merged array element shape)
+4. Arrays: gathers shapes of each element then merges into a single normalized schema.
+5. Reports metrics (depth, unique field count, compression ratio vs. original file size, elapsed time).
 
-- Merges similar structures in arrays
-- Handles empty arrays (`"empty[]"`)
-- Preserves array depth and nesting
+## 🔎 Metrics Explained
 
-### Safety Features
+- Max Depth – Deepest nested object/array level.
+- Unique Fields – Count of unique dotted field paths.
+- Compression – `(structureSize / originalSize) * 100` – a rough indicator of structure conciseness.
 
-- Input file validation
-- File type checking
-- Automatic output directory creation
-- Error handling with helpful messages
+## ⚠️ Error Cases
 
-## Error Handling
+- Invalid JSON syntax
+- Missing input path / missing `--stdin`
+- Unsupported file extension (only `.json` currently)
+- File not found / permission denied
 
-The tool provides clear error messages for common issues:
+All exit with non‑zero status for easy scripting.
 
-- Invalid JSON format
-- File not found
-- Unsupported file types
-- Permission issues
-- Invalid output paths
+## 🛠 Development
 
-## Contributing
+```bash
+bun install
+bun start -i examples/sample.json -v
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
 
-## License
+PRs welcome! Some ideas:
 
-MIT License - feel free to use this tool in your projects.
+- Streaming / incremental parsing for huge JSON
+- Add type frequency stats
+- Support more input formats (NDJSON, YAML)
+- Option to emit TypeScript interface stubs
 
-## Author
+## 📄 License
 
-Paul van der Lei - 0pilatos0
+MIT – use it freely.
 
-## Acknowledgments
+## 👤 Author
 
-Built with:
+Paul van der Lei (@0pilatos0)
 
-- [Bun](https://bun.sh) - Fast JavaScript runtime
-- [chalk](https://github.com/chalk/chalk) - Terminal string styling
-- [ora](https://github.com/sindresorhus/ora) - Elegant terminal spinners
+## 🙏 Acknowledgments
+
+- [Bun](https://bun.sh)
+- [chalk](https://github.com/chalk/chalk)
+- [ora](https://github.com/sindresorhus/ora)
